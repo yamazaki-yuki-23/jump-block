@@ -23,7 +23,8 @@ function applyGravity(entity) {
 }
 
 function applyJump(entity) {
-    entity.vy = -5;
+    if(entity.y <= 40) return entity.vy = 3;
+    entity.vy = -4;
 }
 
 function drawPlayer(entity) {
@@ -40,25 +41,29 @@ function playerIsAlive(entity) {
 
 // ブロックエンティティ
 
-function createBlock(y) {
+function createBlock(y, vx) {
     return {
         x: 900,
         y,
-        vx: -2,
-        vy: 0
+        vx: -vx,
+        vy: 0.2
     };
 }
 
 function drawBlock(entity) {
     noStroke();
     fill("eeeeee");
-    rect(entity.x, entity.y, 80, 400);
+    rect(entity.x, entity.y, 60, 400);
 }
 
 function blockIsAlive(entity) {
     // ブロックの位置が生存圏内ならtrueを返す。
     // -100は適当な値(ブロックが見えなくなる位置であれば良い)
     return -100 < entity.x;
+}
+
+function applyUpAndDown(entity) {
+   return entity.vy = -entity.vy;
 }
 
 // パーティクルエンティティ用
@@ -87,7 +92,7 @@ function particleIsAlive(particle) {
 function drawParticle(particle) {
     push();
     noStroke();
-    fill(255, particle.life * 255);
+    fill("#cff6cf");
     square(particle.x, particle.y, particle.life * 10);
     pop();
 }
@@ -209,19 +214,27 @@ let particles;
 /** ゲームの状態。"play" か "gameover" を入れるものとする */
 let gameState;
 
+/** ゲーム内で使用するBGM */
+let jumpBgm;
+let gameOverBgm
+
 /** 衝突判定の基準  */
 const playerHalfWidth = 20;
 const playerHalfHeight = 20;
-const blockHalfWidth = 40;
+const blockHalfWidth = 30;
 const blockHalfHeight = 200;
 const collisionXDistance = playerHalfWidth + blockHalfWidth;
 const collisionYDistance = playerHalfHeight + blockHalfHeight;
 
+/** ブロックの縦移動量 */
+var verticalMovingDistance = 2; 
+
 /** ブロックを上下ペアで作成し、'blocks'に追加する */
 function addBlockPair() {
     let y = random(-100, 100);
-    blocks.push(createBlock(y)); // 上のブロック
-    blocks.push(createBlock(y + 600)); // 下のブロック
+    let vx = random(1.7, 2);
+    blocks.push(createBlock(y, vx)); // 上のブロック
+    blocks.push(createBlock(y + 600, vx)); // 下のブロック
 }
 
 function drawGameoverScreen() {
@@ -253,6 +266,7 @@ function resetGame() {
 
 function setGameOver() {
     gameState = 'gameover';
+    gameOverBgm.play();
     setShake(300);
     setFlash(128, 60);
 }
@@ -267,7 +281,7 @@ function updateGame() {
     if (gameState === "gameover") return;
 
     // ブロックの追加
-    if(frameCount % 120 === 1) addBlockPair(blocks); //一定間隔で追加
+    if(frameCount % 100 === 1) addBlockPair(blocks); //一定間隔で追加
 
     // パーティクルの追加
     particles.push(createParticle(player.x, player.y)); // プレイヤーの位置で
@@ -283,6 +297,9 @@ function updateGame() {
     
     // プレイヤーに重力を適用
     applyGravity(player);
+
+    // ブロックを縦方向に動かす
+    if(frameCount % 100 === 1) for(let block of blocks) applyUpAndDown(block);
 
     // パーティグルのライフ減少
     for(let particle of particles) decreaseLife(particle);
@@ -330,8 +347,16 @@ function onMousePress() {
         case "gameover":
             // ゲームオーバー状態ならリセット
             resetGame();
+            gameOverBgm.stop();
             break;
     }
+}
+
+/** bgmファイルを読み込む */
+function preload() {
+    soundFormats('mp3', 'ogg');
+    jumpBgm = loadSound('./bgm/レトロジャンプ.mp3');
+    gameOverBgm = loadSound('./bgm/失敗、ゲームオーバー.mp3');
 }
 
 // ---- setup/draw 他 --------------------------------------------------
@@ -339,7 +364,6 @@ function onMousePress() {
 function setup() {
     createCanvas(800, 600);
     rectMode(CENTER);
-
     resetGame();
 }
 
@@ -350,4 +374,5 @@ function draw() {
 
 function mousePressed(){
     onMousePress();
+    jumpBgm.play();
 }
