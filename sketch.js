@@ -29,7 +29,7 @@ function applyJump(entity) {
 
 function drawPlayer(entity) {
     noStroke();
-    fill("#cff6cf");
+    fill("eeeeee");
     square(entity.x, entity.y, 40);
 }
 
@@ -51,9 +51,15 @@ function createBlock(y, vx) {
 }
 
 function drawBlock(entity) {
+    push();
+    drawingContext.shadowOffsetX = 7;
+    drawingContext.shadowOffsetY = -7;
+    drawingContext.shadowBlur = 10;
+    drawingContext.shadowColor = 'gray';
     noStroke();
     fill("eeeeee");
     rect(entity.x, entity.y, 60, 400);
+    pop();
 }
 
 function blockIsAlive(entity) {
@@ -92,9 +98,75 @@ function particleIsAlive(particle) {
 function drawParticle(particle) {
     push();
     noStroke();
-    fill("#cff6cf");
+    fill(255, particle.life * 255);
     square(particle.x, particle.y, particle.life * 10);
     pop();
+}
+
+// コインエンティティ用
+function createCoin(y) {
+    return {
+        x: 900,
+        y,
+        vx: -2,
+        vy: 0
+    };
+}
+
+function drawCoin(entity) {
+    push();
+    drawingContext.shadowOffsetY = 7;
+    drawingContext.shadowColor = color(0, 0, 0);
+    noStroke();
+    fill("#ffdf11");
+    circle(entity.x, entity.y, 40);
+    pop();
+}
+
+function coinIsAlive(entity) {
+    // ブロックの位置が生存圏内ならtrueを返す。
+    // -100は適当な値(ブロックが見えなくなる位置であれば良い)
+    return -100 < entity.x;
+}
+
+// スターエンティティ用
+function createStar(y) {
+    return {
+        x: 900,
+        y,
+        vx: -2,
+        vy: 0
+    };
+}
+
+function drawStar(entity) {
+    push();
+    drawingContext.shadowOffsetY = 7;
+    drawingContext.shadowColor = color(0, 0, 0);
+    star(entity.x, entity.y, 15, 30, 5);
+    pop();
+}
+
+function star(x, y, radius1, radius2, npoints) {
+    let angle = TWO_PI / npoints;
+    let halfAngle = angle / 2.0;
+    beginShape();
+    for (let a = 0; a < TWO_PI; a += angle) {
+        let sx = x + cos(a) * radius2;
+        let sy = y + sin(a) * radius2;
+        vertex(sx, sy);
+        sx = x + cos(a + halfAngle) * radius1;
+        sy = y + sin(a + halfAngle) * radius1;
+        vertex(sx, sy);
+    }
+    fill("#ffdf11");
+    endShape(CLOSE);
+}
+
+function starIsAlive(entity) {
+    // ブロックの位置が生存圏内ならtrueを返す。
+    // -100は適当な値(ブロックが見えなくなる位置であれば良い)
+    return -100 < entity.x;
 }
 
 // 複数のエンティティを処理する関数
@@ -208,6 +280,12 @@ let player;
 /** ブロックエンティティの配列 */
 let blocks;
 
+/** コインエンティティの配列 */
+let coins;
+
+/** スターエンティティの配列 */
+let stars;
+
 /** パーティクルエンティティの配列 */
 let particles;
 
@@ -237,6 +315,18 @@ function addBlockPair() {
     blocks.push(createBlock(y + 600, vx)); // 下のブロック
 }
 
+/** コインを作成し、'coins'に追加する */
+function addCoin() {
+    let y = height / 2;
+    coins.push(createCoin(y));
+}
+
+/** コインを作成し、'coins'に追加する */
+function addStar() {
+    let y = random(400, 500) / 2;
+    stars.push(createStar(y));
+}
+
 function drawGameoverScreen() {
     background(0, 192); // 透明度192の黒
     fill(255);
@@ -255,6 +345,12 @@ function resetGame() {
 
     //　ブロックの配列準備
     blocks = [];
+
+    // スターの配列準備
+    stars = [];
+
+    // コインの配列準備
+    coins = [];
 
     // パーティクルの配列準備
     particles = [];
@@ -281,18 +377,28 @@ function updateGame() {
     if (gameState === "gameover") return;
 
     // ブロックの追加
-    if(frameCount % 100 === 1) addBlockPair(blocks); //一定間隔で追加
+    if(frameCount % 100 === 1) addBlockPair(blocks); // 一定間隔で追加
+
+    // コインの追加
+    if(frameCount % 500 === 1) addCoin(coins); // 一定間隔で追加
+
+    // スターの追加
+    if(frameCount % 1050 === 1) addStar(stars); // 一定間隔で追加
 
     // パーティクルの追加
     particles.push(createParticle(player.x, player.y)); // プレイヤーの位置で
 
     // 死んだエンティティの削除
     blocks = blocks.filter(blockIsAlive); //生きているブロックだけ残す
+    coins = coins.filter(coinIsAlive);
+    stars = stars.filter(starIsAlive);
     particles = particles.filter(particleIsAlive);
 
     // 全エンティティの位置を更新
     updatePosition(player);
     for(let block of blocks) updatePosition(block);
+    for(let coin of coins) updatePosition(coin);
+    for(let star of stars) updatePosition(star);    
     for(let particle of particles) updatePosition(particle);
     
     // プレイヤーに重力を適用
@@ -325,9 +431,11 @@ function drawGame() {
     applyShake();
     
     // 全エンティティを描画
-    background("#f6def6");
+    background(0);
     drawPlayer(player)
     for(let block of blocks) drawBlock(block);
+    for(let coin of coins) drawCoin(coin);
+    for(let star of stars) drawStar(star);
     for(let particle of particles) drawParticle(particle);
 
     // ゲームオーバーならそれ用の画面を表示
@@ -357,6 +465,8 @@ function preload() {
     soundFormats('mp3', 'ogg');
     jumpBgm = loadSound('./bgm/レトロジャンプ.mp3');
     gameOverBgm = loadSound('./bgm/失敗、ゲームオーバー.mp3');
+    coinGetSound = loadSound('./bgm/コイン.mp3');
+    starGetSound = loadSound('./bgm/bonus_challenge.mp3');
 }
 
 // ---- setup/draw 他 --------------------------------------------------
